@@ -20,7 +20,7 @@ func (p *Producer) Publish(msg interface{}, key []byte, topic string) error {
 	}
 
 	message := &ckafka.Message{
-		TopicPartition: ckafka.TopicPartition{Topic: &topic, Partition: 1},
+		TopicPartition: ckafka.TopicPartition{Topic: &topic, Partition: ckafka.PartitionAny},
 		Key:            key,
 		Value:          msg.([]byte),
 	}
