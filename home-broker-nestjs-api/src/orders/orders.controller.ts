@@ -2,13 +2,14 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { OrdersService } from './orders.service'
 import { InitTransactionDto, InputExecuteTransactionDto } from './orders.dto'
 import { MessagePattern, Payload } from '@nestjs/microservices'
+import { OrderStatus, OrderType } from '@prisma/client'
 
 type ExecuteTransactionMessage = {
   order_id: string;
   investor_id: string;
   asset_id: string;
-  order_type: string;
-  status: 'OPEN' | 'CLOSED';
+  order_type: OrderType;
+  status: OrderStatus;
   partial: number;
   shares: number;
   transactions: {
@@ -43,15 +44,14 @@ export class OrdersController {
 
 	@Post('execute')
 	executeTransactionRest(
-    @Param('wallet_id') wallet_id: string,
-    @Body() body: InputExecuteTransactionDto
+		@Body() body: InputExecuteTransactionDto
 	) {
 		return this.ordersService.executeTransaction(body)
 	}
 
 	@MessagePattern('output')
 	async executeTransactionConsumer(
-    @Payload() message: ExecuteTransactionMessage
+		@Payload() message: ExecuteTransactionMessage
 	) {
 		const transaction = message.transactions[message.transactions.length - 1]
 		await this.ordersService.executeTransaction({

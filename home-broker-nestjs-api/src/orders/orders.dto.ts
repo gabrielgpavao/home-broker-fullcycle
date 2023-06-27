@@ -1,4 +1,4 @@
-import { OrderType } from '@prisma/client'
+import { OrderStatus, OrderType } from '@prisma/client'
 
 export class InitTransactionDto {
 	asset_id: string
@@ -10,7 +10,7 @@ export class InitTransactionDto {
 
 export class InputExecuteTransactionDto {
 	order_id: string
-	status: 'OPEN' | 'CLOSED'
+	status: OrderStatus
 	related_investor_id: string
 	broker_transaction_id: string
 	negotiated_shares: number

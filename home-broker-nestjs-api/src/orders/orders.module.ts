@@ -13,7 +13,6 @@ import { ClientsModule, Transport } from '@nestjs/microservices'
 					client: {
 						clientId: 'orders',
 						brokers: ['host.docker.internal:9094']
-						//brokers: ['kafka:29092'], // para interna do docker
 					}
 				}
 			}
