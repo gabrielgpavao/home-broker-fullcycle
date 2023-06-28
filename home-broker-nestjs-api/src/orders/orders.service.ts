@@ -1,15 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma/prisma.service'
 import { InitTransactionDto, InputExecuteTransactionDto } from './orders.dto'
-import { OrderStatus, OrderType } from '@prisma/client'
+import { Order, OrderStatus, OrderType } from '@prisma/client'
 import { ClientKafka } from '@nestjs/microservices'
+import { Observable } from 'rxjs'
+import { Order as OrderSchema } from './orders.schema'
+import { Model } from 'mongoose'
+import { InjectModel } from '@nestjs/mongoose'
 
 @Injectable()
 export class OrdersService {
 	constructor(
-    private prismaService: PrismaService,
-    @Inject('ORDERS_PUBLISHER')
-    private readonly kafkaClient: ClientKafka
+		private prismaService: PrismaService,
+		@Inject('ORDERS_PUBLISHER')
+		private readonly kafkaClient: ClientKafka,
+		@InjectModel(OrderSchema.name) private orderModel: Model<OrderSchema>
 	) {}
 
 	all(filter: { wallet_id: string }) {
@@ -45,6 +50,7 @@ export class OrdersService {
 				version: 1
 			}
 		})
+
 		this.kafkaClient.emit('input', {
 			order_id: order.id,
 			investor_id: order.wallet_id,
@@ -53,6 +59,7 @@ export class OrdersService {
 			price: order.price,
 			order_type: order.type
 		})
+
 		return order
 	}
 
@@ -78,6 +85,7 @@ export class OrdersService {
 					version: { increment: 1 }
 				}
 			})
+
 			if (input.status === OrderStatus.CLOSED) {
 				await prisma.asset.update({
 					where: { id: order.asset_id },
@@ -85,6 +93,15 @@ export class OrdersService {
 						price: input.price
 					}
 				})
+
+				await this.prismaService.assetDaily.create({
+					data: {
+						asset_id: order.asset_id,
+						date: new Date(),
+						price: input.price
+					}
+				})
+
 				const walletAsset = await prisma.walletAsset.findUnique({
 					where: {
 						wallet_id_asset_id: {
@@ -93,8 +110,8 @@ export class OrdersService {
 						}
 					}
 				})
+
 				if (walletAsset) {
-					console.log(walletAsset)
 					await prisma.walletAsset.update({
 						where: {
 							wallet_id_asset_id: {
@@ -121,6 +138,36 @@ export class OrdersService {
 					})
 				}
 			}
+		})
+	}
+
+	subscribeEvents(wallet_id: string): Observable<{ event: 'order-created' | 'order-updated'; data: Order }> {
+		return new Observable((observer) => {
+			this.orderModel
+				.watch(
+					[
+						{
+							$match: {
+								$or: [{ operationType: 'insert' }, { operationType: 'update' }],
+								'fullDocument.wallet_id': wallet_id
+							}
+						}
+					],
+					{ fullDocument: 'updateLookup' }
+				)
+				.on('change', async (data) => {
+					const order = await this.prismaService.order.findUnique({
+						where: {
+							id: data.fullDocument._id + ''
+						}
+					})
+					observer.next({
+						event: data.operationType === 'insert'
+							? 'order-created'
+							: 'order-updated',
+						data: order
+					})
+				})
 		})
 	}
 }

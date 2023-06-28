@@ -1,4 +1,4 @@
-export function isHomeBrokerClosed() {
+export function isMarketClosed() {
 	const currentDate = new Date()
 	const closeDate = new Date(
 		currentDate.getFullYear(),

@@ -1,25 +1,91 @@
-import { baseUrl } from '@/services/baseUrl'
-import { WalletAsset } from '../models'
-import { isHomeBrokerClosed } from '@/utils/revalidateCondition'
+'use client'
+
+import { Asset, WalletAsset } from '../models'
 import { Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from './flowbite-components'
 import Link from 'next/link'
+import useSWR from 'swr'
+import useSWRSubscription, { SWRSubscriptionOptions } from 'swr/subscription'
+import { fetcher } from '@/utils/fetcher'
 
 interface iHomePageProps {
 	wallet_id: string
 }
 
-async function getWalletAssets(wallet_id: string): Promise<WalletAsset[]> {
-	const response = await fetch(baseUrl + `/wallets/${wallet_id}/assets`, {
-		next: {
-			revalidate: isHomeBrokerClosed() ? 60 * 60 : 5
+export default function MyWallet({ wallet_id }: iHomePageProps) {
+	const { data: walletAssets, error, mutate: mutateWalletAssets } = useSWR<WalletAsset[]>(
+		`http://localhost:3001/api/wallets/${wallet_id}/assets`,
+		fetcher,
+		{
+			fallbackData: [],
+			revalidateOnFocus: false,
+			revalidateOnReconnect: false
 		}
-	})
-	return response.json()
-}
+	)
 
-export default async function MyWallet({ wallet_id }: iHomePageProps) {
-	const walletAssets = await getWalletAssets(wallet_id)
+	const { data: assetChanged } = useSWRSubscription(
+		'http://localhost:3000/assets/events',
+		(path, { next }: SWRSubscriptionOptions) => {
+			const eventSource = new EventSource(path)
+
+			eventSource.addEventListener('asset-price-changed', async (event) => {
+				const assetChanged: Asset = JSON.parse(event.data)
+
+				await mutateWalletAssets((prev) => {
+					const foundIndex = prev!.findIndex((walletAsset) => walletAsset.asset_id === assetChanged.id)
+				
+					if (foundIndex !== -1) {
+						prev![foundIndex].Asset.price = assetChanged.price
+					}
+
+					return [...prev!]
+				}, false)
+				next(null, assetChanged)
+			})
+
+			eventSource.onerror = (event) => {
+				console.error(event)
+				eventSource.close()
+			}
+
+			return () => {
+				eventSource.close()
+			}
+		},
+		{}
+	)
 	
+	const { data: walletAssetUpdated } = useSWRSubscription(
+		`http://localhost:3000/wallets/${wallet_id}/assets/events`,
+		(path, { next }: SWRSubscriptionOptions) => {
+			const eventSource = new EventSource(path)
+
+			eventSource.addEventListener('wallet-asset-updated', async (event) => {
+				const walletAssetUpdated: WalletAsset = JSON.parse(event.data)
+
+				await mutateWalletAssets((prev) => {
+					const foundIndex = prev?.findIndex((walletAsset) => walletAsset.asset_id === walletAssetUpdated.asset_id)
+
+					if (foundIndex !== -1) {
+						prev![foundIndex!].shares = walletAssetUpdated.shares
+					}
+
+					return [...prev!]
+				}, false)
+
+				next(null, walletAssetUpdated)
+			})
+
+			eventSource.onerror = (error) => {
+				console.error(error)
+				eventSource.close()
+			}
+
+			return () => {
+				eventSource.close()
+			}
+		}
+	)
+
 	return (
 		<Table>
 			<TableHead>
@@ -31,7 +97,7 @@ export default async function MyWallet({ wallet_id }: iHomePageProps) {
 				</TableHeadCell>
 			</TableHead>
 			<TableBody className="divide-y">
-				{walletAssets.map((walletAsset, key) => (
+				{walletAssets!.map((walletAsset, key) => (
 					<TableRow className="border-gray-700 bg-gray-800" key={key}>
 						<TableCell className="whitespace-nowrap font-medium text-white">
 							{walletAsset.Asset.id} ({walletAsset.Asset.symbol})

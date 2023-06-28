@@ -1,9 +1,9 @@
 import { Order } from '@/app/models'
 import { baseUrl } from '../../services/baseUrl'
-import { isHomeBrokerClosed } from '@/utils/revalidateCondition'
+import { isMarketClosed } from '@/utils/revalidateCondition'
 import { Badge, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from './flowbite-components'
 
-interface iHomePageProps {
+interface iMyOrdersProps {
 	wallet_id: string
 }
 
@@ -11,14 +11,14 @@ async function getOrders(wallet_id: string): Promise<Order[]> {
 	const response = await fetch(baseUrl + `/wallets/${wallet_id}/orders`,	{
 		next: {
 			tags: [`orders-wallet-${wallet_id}`],
-			revalidate: isHomeBrokerClosed() ? 60 * 60 : 5
+			revalidate: isMarketClosed() ? 60 * 60 : 5
 		}
 	})
 
 	return await response.json()
 }
 
-export default async function MyOrders ({ wallet_id }: iHomePageProps) {
+export default async function MyOrders ({ wallet_id }: iMyOrdersProps) {
 	const orders = await getOrders(wallet_id)
 	
 	return (

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, MessageEvent, Param, Post, Sse } from '@nestjs/common'
 import { OrdersService } from './orders.service'
 import { InitTransactionDto, InputExecuteTransactionDto } from './orders.dto'
 import { MessagePattern, Payload } from '@nestjs/microservices'
 import { OrderStatus, OrderType } from '@prisma/client'
+import { Observable, map } from 'rxjs'
 
 type ExecuteTransactionMessage = {
   order_id: string;
@@ -50,9 +51,7 @@ export class OrdersController {
 	}
 
 	@MessagePattern('output')
-	async executeTransactionConsumer(
-		@Payload() message: ExecuteTransactionMessage
-	) {
+	async executeTransactionConsumer(@Payload() message: ExecuteTransactionMessage) {
 		const transaction = message.transactions[message.transactions.length - 1]
 		await this.ordersService.executeTransaction({
 			order_id: message.order_id,
@@ -65,5 +64,15 @@ export class OrdersController {
 			negotiated_shares: transaction.shares,
 			price: transaction.price
 		})
+	}
+
+	@Sse('events')
+	events(@Param('wallet_id') wallet_id: string): Observable<MessageEvent> {
+		return this.ordersService.subscribeEvents(wallet_id).pipe(
+			map((event) => ({
+				type: event.event,
+				data: event.data
+			}))
+		)
 	}
 }

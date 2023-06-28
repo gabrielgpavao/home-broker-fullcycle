@@ -3,7 +3,8 @@ import OrderForm from '@/app/components/OrderForm'
 import { Card, TabsGroup, TabsItem } from '@/app/components/flowbite-components'
 import { OrderType } from '@/app/models'
 import { HiArrowUp, HiShoppingCart } from '@/app/components/react-icons/hi'
-import { ChartComponent } from '@/app/components/ChartComponent'
+import { SyncOrders } from '@/app/components/SyncOrders'
+import AssetChartComponent from '@/app/components/AssetChartComponent'
 
 interface iHomePageProps {
 	params: {
@@ -50,17 +51,20 @@ export default async function HomeBrokerPage({ params }: iHomePageProps) {
 						<Card
 							theme={{
 								root: {
-									children:
-						'flex h-full flex-col justify-center gap-4 py-4 px-2',
+									children: 'flex h-full flex-col justify-center gap-4 py-4 px-2',
 								},
 							}}
 						>
-							<MyOrders wallet_id={params.wallet_id} />
+							<SyncOrders wallet_id={params.wallet_id}>
+								<div className="max-h-96 overflow-y-auto overflow-hidden">
+									<MyOrders wallet_id={params.wallet_id} />
+								</div>
+							</SyncOrders>
 						</Card>
 					</div>
 				</div>
 				<div className="col-span-3 flex flex-grow">
-					<ChartComponent header="Asset 1 - R$ 100" />
+					<AssetChartComponent asset_id={params.asset_id}/>
 				</div>
 			</div>
 		</main>
